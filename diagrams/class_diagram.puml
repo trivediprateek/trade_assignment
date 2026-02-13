@@ -1,0 +1,180 @@
+@startuml Class Diagram
+
+title Trade Store - Class Diagram with Kafka
+
+' Models
+class Trade {
+  + trade_id: String {PK}
+  + version: Integer {PK}
+  + counter_party_id: String
+  + book_id: String
+  + maturity_date: Date
+  + created_date: Date
+  + expired: Boolean
+  __
+  + __repr__(): String
+}
+
+' Schemas
+class TradeBase {
+  + trade_id: str
+  + version: int
+  + counter_party_id: str
+  + book_id: str
+  + maturity_date: date
+  + created_date: date
+  + expired: bool
+  __
+  + validate_maturity_date(): date
+}
+
+class TradeCreate {
+  ' Inherits from TradeBase
+}
+
+class TradeResponse {
+  ' Inherits from TradeBase
+  + Config: orm_mode = True
+}
+
+class TradeUpdate {
+  + counter_party_id: Optional[str]
+  + book_id: Optional[str]
+  + maturity_date: Optional[date]
+  + created_date: Optional[date]
+  + expired: Optional[bool]
+  __
+  + validate_maturity_date(): date
+}
+
+' Kafka Components
+class KafkaMessage {
+  + operation: str
+  + data: dict
+  __
+  + to_json(): str
+  + from_json(json_str): KafkaMessage
+}
+
+class KafkaProducer {
+  - config: dict
+  - producer: Producer
+  __
+  + produce(topic, key, value): void
+  + flush(): void
+}
+
+class KafkaConsumer {
+  - config: dict
+  - consumer: Consumer
+  - running: bool
+  __
+  + subscribe(topics): void
+  + poll(timeout): Message
+  + commit(): void
+  + close(): void
+}
+
+class MessageProcessor {
+  + process_trade_message(message, db): bool
+  - _handle_create(data, db): bool
+  - _handle_update(data, db): bool
+  - _handle_delete(data, db): bool
+}
+
+' Service Layer
+class TradeService {
+  {static} + get_trade(db, trade_id, version): Trade
+  {static} + get_latest_trade_version(db, trade_id): Trade
+  {static} + get_all_trades(db, skip, limit): List[Trade]
+  {static} + create_trade(db, trade): Trade
+  {static} + update_trade(db, trade_id, version, update): Trade
+  {static} + delete_trade(db, trade_id, version): bool
+  {static} + mark_expired_trades(db): int
+}
+
+' API Layer
+class FastAPIApp {
+  + kafka_producer: KafkaProducer
+  __
+  + create_trade(trade): Response
+  + update_trade(id, version, update): Response
+  + delete_trade(id, version): Response
+  + get_trade(id, version): Trade
+  + get_all_trades(): List[Trade]
+}
+
+' Database
+class Database {
+  + engine: Engine
+  + SessionLocal: sessionmaker
+  + Base: declarative_base
+  __
+  + get_db(): Session
+}
+
+' Relationships
+TradeBase <|-- TradeCreate
+TradeBase <|-- TradeResponse
+
+' API and Kafka Flow
+FastAPIApp --> KafkaProducer : uses
+FastAPIApp --> KafkaMessage : creates
+KafkaProducer --> KafkaMessage : publishes
+
+' Consumer Flow
+KafkaConsumer --> MessageProcessor : delivers messages
+MessageProcessor --> KafkaMessage : parses
+MessageProcessor --> TradeService : calls
+
+' Service Layer
+TradeService ..> Trade : uses
+TradeService ..> TradeCreate : uses
+TradeService ..> TradeUpdate : uses
+TradeService ..> Database : uses
+Trade ..> Database : persisted in
+
+note right of KafkaMessage
+  **Message Format:**
+  {
+    "operation": "CREATE|UPDATE|DELETE",
+    "data": {
+      "trade_id": "...",
+      "version": 1,
+      ...
+    }
+  }
+end note
+
+note right of TradeService
+  **Business Validations:**
+  1. Reject lower versions
+  2. Replace same versions
+  3. Reject past maturity dates
+  4. Auto-expire matured trades
+end note
+
+note left of Trade
+  **Composite Primary Key:**
+  (trade_id, version)
+end note
+
+note right of MessageProcessor
+  **Processing Logic:**
+  - Parse operation type
+  - Validate data
+  - Route to service method
+  - Commit offset on success
+end note
+
+note left of FastAPIApp
+  **Write Operations:**
+  Return 202 Accepted
+  (Queued to Kafka)
+  
+  **Read Operations:**
+  Return 200 OK
+  (Direct DB query)
+end note
+
+@enduml

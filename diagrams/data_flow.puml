@@ -1,0 +1,114 @@
+@startuml Kafka Data Flow
+
+title Complete Data Flow - Write and Read Paths
+
+actor Client
+
+package "Write Path (Async)" {
+    participant "FastAPI\n(Producer)" as API
+    queue "Kafka Topic\n(3 partitions)" as Kafka
+    participant "Consumer\nService" as Consumer
+}
+
+package "Read Path (Sync)" {
+    participant "FastAPI\n(Query)" as QueryAPI
+}
+
+database "PostgreSQL" as DB
+
+== Write Operations (CREATE/UPDATE/DELETE) ==
+
+Client -> API: POST/PUT/DELETE\n{trade_data}
+activate API
+
+API -> API: 1. Validate Schema\n(Pydantic)
+
+API -> API: 2. Build Message\n{operation, data}
+
+API -> Kafka: 3. Produce Message\n(key=trade_id)
+activate Kafka
+
+Kafka -> Kafka: 4. Partition by Key\n(trade_id % 3)
+
+Kafka --> API: 5. ACK
+deactivate Kafka
+
+API --> Client: 6. 202 Accepted\n(Queued)
+deactivate API
+
+...Async Processing...
+
+Kafka -> Consumer: 7. Poll Message
+activate Consumer
+
+Consumer -> Consumer: 8. Parse & Validate
+
+Consumer -> Consumer: 9. Route by Operation\n(CREATE/UPDATE/DELETE)
+
+Consumer -> DB: 10. Execute\n(INSERT/UPDATE/DELETE)
+activate DB
+
+DB --> Consumer: 11. Success
+deactivate DB
+
+Consumer -> Kafka: 12. Commit Offset
+activate Kafka
+Kafka --> Consumer: ACK
+deactivate Kafka
+
+deactivate Consumer
+
+== Read Operations (GET) ==
+
+Client -> QueryAPI: GET /trades\nor /trades/{id}/{version}
+activate QueryAPI
+
+QueryAPI -> DB: SELECT Query
+activate DB
+
+DB --> QueryAPI: Result Set
+deactivate DB
+
+QueryAPI --> Client: 200 OK\n{trade_data}
+deactivate QueryAPI
+
+note right of Kafka
+  **Message Format:**
+  {
+    "operation": "CREATE|UPDATE|DELETE",
+    "data": {
+      "trade_id": "T001",
+      "version": 1,
+      ...other fields...
+    }
+  }
+  
+  **Partitioning:**
+  - Same trade_id → same partition
+  - Preserves ordering per trade
+  - Enables parallel processing
+end note
+
+note right of Consumer
+  **Processing Guarantees:**
+   At-least-once delivery
+   Manual offset commits
+   Ordered per partition
+   Idempotent operations
+   Error handling & retry
+end note
+
+note left of Client
+  **API Responses:**
+  
+  Write Operations:
+  → 202 Accepted (async)
+  → 422 Validation Error (sync)
+  → 503 Kafka Unavailable (sync)
+  
+  Read Operations:
+  → 200 OK (sync)
+  → 404 Not Found (sync)
+end note
+
+@enduml

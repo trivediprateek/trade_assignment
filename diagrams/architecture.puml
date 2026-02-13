@@ -1,0 +1,117 @@
+@startuml Trade Store Architecture
+
+' Component Diagram with Kafka
+title Trade Store - Event-Driven Architecture
+
+package "Client Layer" {
+  [API Client] as Client
+}
+
+package "API Layer (Write Path)" {
+  [FastAPI Application] as API
+  [Kafka Producer] as Producer
+}
+
+package "Message Queue" {
+  queue "Apache Kafka" as Kafka {
+    [Partition 0] as P0
+    [Partition 1] as P1
+    [Partition 2] as P2
+  }
+  [Zookeeper] as ZK
+}
+
+package "Consumer Layer" {
+  [Kafka Consumer] as Consumer
+  [Message Processor] as Processor
+}
+
+package "Business Logic Layer" {
+  [TradeService] as Service
+  [Validation Logic] as Validation
+}
+
+package "Data Access Layer" {
+  [SQLAlchemy ORM] as ORM
+  [Trade Model] as Model
+}
+
+package "Database Layer" {
+  database "PostgreSQL" as DB {
+    [trades table] as Table
+  }
+}
+
+' Write Flow (Async)
+Client --> API : POST/PUT/DELETE\n(HTTP)
+API --> Producer : Build Message
+Producer --> Kafka : Produce\n{operation, data}
+Kafka --> Consumer : Poll Messages
+Consumer --> Processor : Process Message
+Processor --> Service : CRUD Operations
+Service --> Validation : Validate Rules
+Service --> ORM : Database Access
+ORM --> Model : Map Objects
+Model --> Table : Persist Data
+
+' Read Flow (Sync)
+Client --> API : GET (HTTP)
+API --> Service : Query Data
+Service --> ORM : Read Operations
+ORM --> Table : SELECT
+Table --> ORM : Result Set
+ORM --> API : Trade Objects
+API --> Client : JSON Response
+
+' Kafka Infrastructure
+Kafka --> ZK : Coordination
+P0 --> Consumer : Consume
+P1 --> Consumer : Consume
+P2 --> Consumer : Consume
+
+note right of Kafka
+  **Topic:** trades
+  **Partitions:** 3
+  **Key:** trade_id
+  **Replication:** 1 (dev)
+  
+  Ensures:
+  - Ordering per trade
+  - Parallel processing
+  - Fault tolerance
+end note
+
+note right of Producer
+  **Message Format:**
+  {
+    "operation": "CREATE|UPDATE|DELETE",
+    "data": {trade_fields}
+  }
+end note
+
+note right of Consumer
+  **Processing:**
+  - Manual offset commits
+  - At-least-once delivery
+  - Error handling with retry
+  - Graceful shutdown
+end note
+
+note right of Validation
+  **Multi-Layer:**
+  1. Schema (Pydantic)
+  2. Business Logic
+  3. Database Constraints
+end note
+
+note left of Client
+  **Write Operations:**
+  Return 202 Accepted
+  (Async via Kafka)
+  
+  **Read Operations:**
+  Return 200 OK
+  (Sync from DB)
+end note
+
+@enduml
