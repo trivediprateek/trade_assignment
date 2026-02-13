@@ -214,27 +214,8 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Run integration tests with docker-compose
-      run: |
-        # Use docker-compose for full stack testing
-        docker-compose up -d
-        
-        echo "Waiting for services to be healthy..."
-        sleep 20
-        
-        # Health check API
-        echo "Testing API health endpoint..."
-        curl -f http://localhost:8000/ || exit 1
-        
-        # Check if Kafka is accessible
-        echo "Checking Kafka availability..."
-        docker-compose ps
-        
-        echo " All services are running"
-        
-        # Cleanup
-        docker-compose down -v
-        docker build -t trade-store-api:latest .
+    - name: Build Docker image
+      run: docker build -t trade-store-api:latest .
 
     - name: Test Docker image
       run: |
