@@ -71,6 +71,12 @@ jobs:
         echo "Waiting for Kafka to be ready..."
         timeout 60 bash -c 'until nc -z localhost 9092; do sleep 1; done'
         echo " Kafka is ready"
+
+    - name: Initialize database
+      env:
+        DATABASE_URL: postgresql://tradeuser:tradepass@localhost:5432/tradedb
+      run: |
+        python scripts/init_db.py
     
     - name: Run unit tests with coverage
       env:
