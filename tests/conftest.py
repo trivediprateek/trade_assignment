@@ -32,9 +32,11 @@ def override_get_db():
 
 @pytest.fixture(scope="function")
 def test_db():
-    """Create fresh database for each test"""
+    """Create fresh database for each test and return a session"""
     Base.metadata.create_all(bind=engine)
-    yield
+    db = TestingSessionLocal()
+    yield db
+    db.close()
     Base.metadata.drop_all(bind=engine)
 
 

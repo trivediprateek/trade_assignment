@@ -49,7 +49,7 @@ def signal_handler(signum, frame):
 def get_kafka_config() -> dict:
     """Get Kafka consumer configuration from environment variables"""
     return {
-        'bootstrap.servers': os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9093'),
+        'bootstrap.servers': os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092'),
         'group.id': os.getenv('KAFKA_GROUP_ID', 'trade-consumer-group'),
         'auto.offset.reset': 'earliest',  # Start from beginning if no offset
         'enable.auto.commit': False,  # Manual commit for reliability

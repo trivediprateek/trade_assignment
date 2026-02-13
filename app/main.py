@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
     """Lifespan events for the application"""
     # Startup: Initialize Kafka producer
     kafka_config = {
-        'bootstrap.servers': os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9093'),
+        'bootstrap.servers': os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092'),
         'client.id': 'trade-api-producer',
     }
     app.state.kafka_producer = Producer(kafka_config)
@@ -216,6 +216,38 @@ def delete_trade(trade_id: str, version: int):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to queue deletion: {str(e)}"
         )
+
+
+@app.get("/trades", response_model=List[TradeResponse], tags=["Trades"])
+def get_all_trades(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """Get all trades with pagination"""
+    from app.models import Trade
+    trades = db.query(Trade).offset(skip).limit(limit).all()
+    return trades
+
+
+@app.get("/trades/{trade_id}/{version}", response_model=TradeResponse, tags=["Trades"])
+def get_trade(trade_id: str, version: int, db: Session = Depends(get_db)):
+    """Get specific trade by ID and version"""
+    trade = TradeService.get_trade(db, trade_id, version)
+    if not trade:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Trade {trade_id} v{version} not found"
+        )
+    return trade
+
+
+@app.get("/trades/{trade_id}/latest", response_model=TradeResponse, tags=["Trades"])
+def get_latest_trade(trade_id: str, db: Session = Depends(get_db)):
+    """Get latest version of a trade"""
+    trade = TradeService.get_latest_trade_version(db, trade_id)
+    if not trade:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Trade {trade_id} not found"
+        )
+    return trade
 
 
 @app.post("/trades/expire", tags=["Trades"])

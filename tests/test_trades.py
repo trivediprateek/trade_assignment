@@ -290,4 +290,4 @@ class TestEdgeCases:
         """Test that maturity date equal to today is accepted"""
         sample_trade["maturity_date"] = date.today().isoformat()
         response = client.post("/trades", json=sample_trade)
-        assert response.status_code == status.HTTP_201_CREATED
+        assert response.status_code == status.HTTP_202_ACCEPTED
