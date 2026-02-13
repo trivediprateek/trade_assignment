@@ -206,7 +206,9 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@ with docker-compose
+      uses: actions/checkout@v4
+
+    - name: Run integration tests with docker-compose
       run: |
         # Use docker-compose for full stack testing
         docker-compose up -d
