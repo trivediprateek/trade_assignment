@@ -70,8 +70,15 @@ class TradeService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Trade {trade_id} with version {version} not found"
             )
-        
+
         update_data = trade_update.model_dump(exclude_unset=True)
+
+        if db_trade.expired:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot update an expired trade",
+            )
+
         for field, value in update_data.items():
             setattr(db_trade, field, value)
         

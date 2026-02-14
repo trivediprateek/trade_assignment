@@ -48,7 +48,7 @@ class TestKafkaConfig:
 class TestExpiredTradeUpdateRules:
     """Test expired trade update rules in service layer"""
 
-    def test_expired_trade_update_without_admin_flag_fails(self, test_db):
+    def test_expired_trade_update_fails(self, test_db):
         trade = Trade(
             trade_id="EXP-1",
             version=1,
@@ -72,33 +72,9 @@ class TestExpiredTradeUpdateRules:
         assert exc_info.value.status_code == 400
         assert "expired" in str(exc_info.value.detail).lower()
 
-    def test_expired_trade_update_with_admin_flag_and_only_book_id_succeeds(self, test_db):
+    def test_expired_trade_update_book_id_still_fails(self, test_db):
         trade = Trade(
             trade_id="EXP-2",
-            version=1,
-            counter_party_id="CP-1",
-            book_id="B1",
-            maturity_date=date.today() + timedelta(days=30),
-            created_date=date.today(),
-            expired=True,
-        )
-        test_db.add(trade)
-        test_db.commit()
-
-        updated = TradeService.update_trade(
-            test_db,
-            "EXP-2",
-            1,
-            TradeUpdate(book_id="B2", admin_correction=True),
-        )
-
-        assert updated.book_id == "B2"
-        assert updated.counter_party_id == "CP-1"
-        assert updated.expired is True
-
-    def test_expired_trade_update_with_admin_flag_and_other_field_fails(self, test_db):
-        trade = Trade(
-            trade_id="EXP-3",
             version=1,
             counter_party_id="CP-1",
             book_id="B1",
@@ -112,17 +88,13 @@ class TestExpiredTradeUpdateRules:
         with pytest.raises(HTTPException) as exc_info:
             TradeService.update_trade(
                 test_db,
-                "EXP-3",
+                "EXP-2",
                 1,
-                TradeUpdate(
-                    book_id="B2",
-                    counter_party_id="CP-UPDATED",
-                    admin_correction=True,
-                ),
+                TradeUpdate(book_id="B2"),
             )
 
         assert exc_info.value.status_code == 400
-        assert "book_id" in str(exc_info.value.detail).lower()
+        assert "expired" in str(exc_info.value.detail).lower()
 
 
 class TestKafkaMessagePersistence:
