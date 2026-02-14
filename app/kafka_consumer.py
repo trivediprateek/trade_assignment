@@ -29,10 +29,7 @@ from app.schemas import TradeCreate, TradeUpdate
 from app.crud import TradeService
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Global flag for graceful shutdown
@@ -49,11 +46,11 @@ def signal_handler(signum, frame):
 def get_kafka_config() -> dict:
     """Get Kafka consumer configuration from environment variables"""
     return {
-        'bootstrap.servers': os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092'),
-        'group.id': os.getenv('KAFKA_GROUP_ID', 'trade-consumer-group'),
-        'auto.offset.reset': 'earliest',  # Start from beginning if no offset
-        'enable.auto.commit': False,  # Manual commit for reliability
-        'max.poll.interval.ms': 300000,  # 5 minutes
+        "bootstrap.servers": os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"),
+        "group.id": os.getenv("KAFKA_GROUP_ID", "trade-consumer-group"),
+        "auto.offset.reset": "earliest",  # Start from beginning if no offset
+        "enable.auto.commit": False,  # Manual commit for reliability
+        "max.poll.interval.ms": 300000,  # 5 minutes
     }
 
 
@@ -64,54 +61,46 @@ def process_trade_message(message_value: str, db: Session) -> bool:
     try:
         message = json.loads(message_value)
 
-        operation = message.get('operation', 'CREATE')
-        data = message.get('data', message)
+        operation = message.get("operation", "CREATE")
+        data = message.get("data", message)
 
-        trade_id = data.get('trade_id')
-        version = data.get('version')
+        trade_id = data.get("trade_id")
+        version = data.get("version")
         logger.info(f"Processing {operation}: {trade_id} v{version}")
-        if operation == 'CREATE':
+        if operation == "CREATE":
             # Validate data
             trade_create = TradeCreate(**data)
-            
+
             # Create trade
             db_trade = TradeService.create_trade(db, trade_create)
-            
-            logger.info(
-                f" Successfully created trade {db_trade.trade_id} "
-                f"version {db_trade.version}"
-            )
+
+            logger.info(f" Successfully created trade {db_trade.trade_id} " f"version {db_trade.version}")
             return True
-        elif operation == 'UPDATE':
+        elif operation == "UPDATE":
             # Validate data
             trade_update = TradeUpdate(**data)
-            
+
             db_trade = TradeService.update_trade(db, trade_id, version, trade_update)
-            
-            logger.info(
-                f" Successfully updated trade {db_trade.trade_id} "
-                f"version {db_trade.version}"
-            )
+
+            logger.info(f" Successfully updated trade {db_trade.trade_id} " f"version {db_trade.version}")
             return True
-            
-        elif operation == 'DELETE':
+
+        elif operation == "DELETE":
             # Delete trade
             TradeService.delete_trade(db, trade_id, version)
-            
-            logger.info(
-                f" Successfully deleted trade {trade_id} version {version}"
-            )
+
+            logger.info(f" Successfully deleted trade {trade_id} version {version}")
             return True
-            
+
         else:
             logger.error(f" Unknown operation: {operation}")
             return False
-        
+
     except ValueError as e:
         # Pydantic validation error
         logger.error(f" Validation error: {e}")
         return False
-        
+
     except Exception as e:
         # Business logic error (version conflict, not found, etc.)
         logger.error(f" Error processing trade: {e}")
@@ -122,33 +111,33 @@ def consume_trades():
     """
     Main consumer loop - continuously reads and processes trades from Kafka
     """
-    topic = os.getenv('KAFKA_TOPIC', 'trades')
+    topic = os.getenv("KAFKA_TOPIC", "trades")
     config = get_kafka_config()
-    
+
     logger.info(f"Starting Kafka consumer...")
     logger.info(f"  Bootstrap servers: {config['bootstrap.servers']}")
     logger.info(f"  Topic: {topic}")
     logger.info(f"  Group ID: {config['group.id']}")
-    
+
     consumer = Consumer(config)
-    
+
     try:
         # Subscribe to topic
         consumer.subscribe([topic])
         logger.info(f" Subscribed to topic '{topic}'")
-        
+
         # Statistics
         processed_count = 0
         error_count = 0
-        
+
         # Main consumption loop
         while running:
             # Poll for messages (1 second timeout)
             msg = consumer.poll(timeout=1.0)
-            
+
             if msg is None:
                 continue  # No message, keep polling
-                
+
             if msg.error():
                 if msg.error().code() == KafkaError._PARTITION_EOF:
                     # End of partition - normal, just continue
@@ -158,19 +147,19 @@ def consume_trades():
                     logger.error(f"Kafka error: {msg.error()}")
                     error_count += 1
                 continue
-            
+
             # Get db session
             db = SessionLocal()
             try:
                 # Process the message
-                message_value = msg.value().decode('utf-8')
+                message_value = msg.value().decode("utf-8")
                 success = process_trade_message(message_value, db)
-                
+
                 if success:
                     # Commit offset only after successful processing
                     consumer.commit(asynchronous=False)
                     processed_count += 1
-                    
+
                     # Log progress every 100 trades
                     if processed_count % 100 == 0:
                         logger.info(f"Progress: {processed_count} trades processed")
@@ -178,10 +167,10 @@ def consume_trades():
                     error_count += 1
                     # Don't commit - message will be reprocessed
                     logger.warning(f"Skipping commit for failed message")
-                    
+
             finally:
                 db.close()
-                
+
     except KeyboardInterrupt:
         logger.info("Interrupted by user")
     except KafkaException as e:
@@ -201,11 +190,11 @@ def main():
     # Register signal handlers for graceful shutdown
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-    
+
     logger.info("=" * 60)
     logger.info("Trade Store Kafka Consumer")
     logger.info("=" * 60)
-    
+
     # Start consuming
     consume_trades()
 

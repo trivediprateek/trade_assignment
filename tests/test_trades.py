@@ -41,7 +41,7 @@ class TestCreateTrade:
         higher_version_trade = sample_trade.copy()
         higher_version_trade["version"] = 2
         higher_version_trade["counter_party_id"] = "CP-2"
-        
+
         response2 = client.post("/trades", json=higher_version_trade)
         # Both operations return 202 (async), actual version validation in consumer
         assert response2.status_code == status.HTTP_202_ACCEPTED
@@ -58,7 +58,7 @@ class TestCreateTrade:
         # API accepts it (202), but consumer will reject it
         lower_version_trade = sample_trade.copy()
         lower_version_trade["version"] = 1
-        
+
         response2 = client.post("/trades", json=lower_version_trade)
         # With async processing, API returns 202 (validation happens in consumer)
         assert response2.status_code == status.HTTP_202_ACCEPTED
@@ -74,10 +74,7 @@ class TestUpdateTrade:
 
         # Update trade
         update_data = {"counter_party_id": "CP-UPDATED"}
-        response = client.put(
-            f"/trades/{sample_trade['trade_id']}/{sample_trade['version']}",
-            json=update_data
-        )
+        response = client.put(f"/trades/{sample_trade['trade_id']}/{sample_trade['version']}", json=update_data)
         # Update returns 202 Accepted (async processing via Kafka)
         assert response.status_code == status.HTTP_202_ACCEPTED
         assert response.json()["status"] == "accepted"
@@ -96,13 +93,8 @@ class TestUpdateTrade:
 
         # Try to update with past maturity date
         # Schema validation still happens at API level, so this should fail with 422
-        update_data = {
-            "maturity_date": (date.today() - timedelta(days=1)).isoformat()
-        }
-        response = client.put(
-            f"/trades/{sample_trade['trade_id']}/{sample_trade['version']}",
-            json=update_data
-        )
+        update_data = {"maturity_date": (date.today() - timedelta(days=1)).isoformat()}
+        response = client.put(f"/trades/{sample_trade['trade_id']}/{sample_trade['version']}", json=update_data)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 

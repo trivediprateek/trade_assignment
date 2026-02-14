@@ -20,29 +20,29 @@ from app.crud import TradeService
 
 class TestKafkaConfig:
     """Test Kafka configuration"""
-    
+
     def test_get_kafka_config_defaults(self):
         """Test default Kafka configuration values"""
-        with patch.dict('os.environ', {}, clear=True):
+        with patch.dict("os.environ", {}, clear=True):
             config = get_kafka_config()
-            
-            assert config['bootstrap.servers'] == 'localhost:9092'
-            assert config['group.id'] == 'trade-consumer-group'
-            assert config['auto.offset.reset'] == 'earliest'
-            assert config['enable.auto.commit'] is False
-    
+
+            assert config["bootstrap.servers"] == "localhost:9092"
+            assert config["group.id"] == "trade-consumer-group"
+            assert config["auto.offset.reset"] == "earliest"
+            assert config["enable.auto.commit"] is False
+
     def test_get_kafka_config_from_env(self):
         """Test Kafka configuration from environment variables"""
         env_vars = {
-            'KAFKA_BOOTSTRAP_SERVERS': 'kafka:9092',
-            'KAFKA_GROUP_ID': 'test-group',
+            "KAFKA_BOOTSTRAP_SERVERS": "kafka:9092",
+            "KAFKA_GROUP_ID": "test-group",
         }
-        
-        with patch.dict('os.environ', env_vars):
+
+        with patch.dict("os.environ", env_vars):
             config = get_kafka_config()
-            
-            assert config['bootstrap.servers'] == 'kafka:9092'
-            assert config['group.id'] == 'test-group'
+
+            assert config["bootstrap.servers"] == "kafka:9092"
+            assert config["group.id"] == "test-group"
 
 
 class TestExpiredTradeUpdateRules:
@@ -117,10 +117,14 @@ class TestKafkaMessagePersistence:
         success = process_trade_message(json.dumps(payload), test_db)
 
         assert success is True
-        saved = test_db.query(Trade).filter(
-            Trade.trade_id == "KAFKA-CREATE-1",
-            Trade.version == 1,
-        ).first()
+        saved = (
+            test_db.query(Trade)
+            .filter(
+                Trade.trade_id == "KAFKA-CREATE-1",
+                Trade.version == 1,
+            )
+            .first()
+        )
         assert saved is not None
         assert saved.counter_party_id == "CP-NEW"
         assert saved.book_id == "BOOK-1"
@@ -150,10 +154,14 @@ class TestKafkaMessagePersistence:
         success = process_trade_message(json.dumps(payload), test_db)
 
         assert success is True
-        updated = test_db.query(Trade).filter(
-            Trade.trade_id == "KAFKA-UPD-1",
-            Trade.version == 1,
-        ).first()
+        updated = (
+            test_db.query(Trade)
+            .filter(
+                Trade.trade_id == "KAFKA-UPD-1",
+                Trade.version == 1,
+            )
+            .first()
+        )
         assert updated is not None
         assert updated.counter_party_id == "CP-NEW"
         assert updated.book_id == "BOOK-OLD"
@@ -182,9 +190,12 @@ class TestKafkaMessagePersistence:
         success = process_trade_message(json.dumps(payload), test_db)
 
         assert success is True
-        deleted = test_db.query(Trade).filter(
-            Trade.trade_id == "KAFKA-DEL-1",
-            Trade.version == 1,
-        ).first()
+        deleted = (
+            test_db.query(Trade)
+            .filter(
+                Trade.trade_id == "KAFKA-DEL-1",
+                Trade.version == 1,
+            )
+            .first()
+        )
         assert deleted is None
-

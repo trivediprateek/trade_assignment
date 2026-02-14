@@ -25,21 +25,21 @@ def init_db():
     print("Database Initialization")
     print(f"\nDatabase URL: {DATABASE_URL}")
     print(f"Engine: {engine}")
-    
+
     try:
         # Create all tables
         print("\nCreating tables...")
         Base.metadata.create_all(bind=engine)
-        
+
         # Verify tables were created
         print("\n Tables created successfully:")
         for table in Base.metadata.sorted_tables:
             print(f"  - {table.name}")
             print(f"    Columns: {', '.join([col.name for col in table.columns])}")
-        
+
         print("\n" + "=" * 60)
         print(" Database initialization complete!")
-        
+
     except Exception as e:
         print(f"\n✗ Error creating database tables: {e}")
         print("\nPlease ensure:")

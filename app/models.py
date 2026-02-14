@@ -4,6 +4,7 @@ from app.database import Base
 
 class Trade(Base):
     """Trade model representing a trade in the database"""
+
     __tablename__ = "trades"
 
     trade_id = Column(String, primary_key=True, index=True)

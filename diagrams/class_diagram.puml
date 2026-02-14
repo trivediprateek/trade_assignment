@@ -101,7 +101,6 @@ class FastAPIApp {
   + update_trade(id, version, update): Response
   + delete_trade(id, version): Response
   + get_trade(id, version): Trade
-  + get_all_trades(): List[Trade]
 }
 
 ' Database

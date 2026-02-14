@@ -15,9 +15,7 @@ from app.database import Base, get_db
 # Use in-memory SQLite for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -44,19 +42,19 @@ def test_db():
 def client(test_db):
     """Create test client with mocked Kafka producer"""
     app.dependency_overrides[get_db] = override_get_db
-    
+
     # Mock Kafka producer to avoid actual Kafka calls in tests
     mock_producer = Mock()
     mock_producer.produce = Mock()
     mock_producer.poll = Mock()
     mock_producer.flush = Mock()
-    
+
     # Set mock producer on app.state
     app.state.kafka_producer = mock_producer
-    
+
     with TestClient(app) as test_client:
         yield test_client
-    
+
     app.dependency_overrides.clear()
 
 
@@ -70,7 +68,7 @@ def sample_trade():
         "book_id": "B1",
         "maturity_date": (date.today() + timedelta(days=365)).isoformat(),
         "created_date": date.today().isoformat(),
-        "expired": False
+        "expired": False,
     }
 
 
@@ -84,13 +82,10 @@ def past_maturity_trade():
         "book_id": "B1",
         "maturity_date": (date.today() - timedelta(days=1)).isoformat(),
         "created_date": date.today().isoformat(),
-        "expired": False
+        "expired": False,
     }
 
 
 @pytest.fixture
 def incomplete_trade():
-    return {
-            "trade_id": "T1",
-            "version": 1
-        }
+    return {"trade_id": "T1", "version": 1}
