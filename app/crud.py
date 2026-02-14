@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, select, insert, update, delete
 from app.models import Trade
 from app.schemas import TradeCreate, TradeUpdate
 from datetime import date
@@ -13,12 +13,14 @@ class TradeService:
     @staticmethod
     def get_trade(db: Session, trade_id: str, version: int) -> Optional[Trade]:
         """Get a specific trade by ID and version"""
-        return db.query(Trade).filter(and_(Trade.trade_id == trade_id, Trade.version == version)).first()
+        stmt = select(Trade).where(and_(Trade.trade_id == trade_id, Trade.version == version))
+        return db.execute(stmt).scalars().first()
 
     @staticmethod
     def get_latest_trade_version(db: Session, trade_id: str) -> Optional[Trade]:
         """Get the latest version of a trade"""
-        return db.query(Trade).filter(Trade.trade_id == trade_id).order_by(Trade.version.desc()).first()
+        stmt = select(Trade).where(Trade.trade_id == trade_id).order_by(Trade.version.desc())
+        return db.execute(stmt).scalars().first()
 
     @staticmethod
     def create_trade(db: Session, trade: TradeCreate) -> Trade:
@@ -41,16 +43,21 @@ class TradeService:
 
             # Same version: Replace existing trade
             if trade.version == latest_trade.version:
-                # Delete existing trade with same version
-                db.delete(latest_trade)
-                db.commit()
+                delete_stmt = delete(Trade).where(
+                    and_(Trade.trade_id == latest_trade.trade_id, Trade.version == latest_trade.version)
+                )
+                db.execute(delete_stmt)
 
         # Create new trade
-        db_trade = Trade(**trade.model_dump())
-        db.add(db_trade)
+        db.execute(insert(Trade).values(**trade.model_dump()))
         db.commit()
-        db.refresh(db_trade)
-        return db_trade
+        created_trade = TradeService.get_trade(db, trade.trade_id, trade.version)
+        if not created_trade:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Trade was created but could not be retrieved",
+            )
+        return created_trade
 
     @staticmethod
     def update_trade(db: Session, trade_id: str, version: int, trade_update: TradeUpdate) -> Trade:
@@ -68,12 +75,17 @@ class TradeService:
                 detail="Cannot update an expired trade",
             )
 
-        for field, value in update_data.items():
-            setattr(db_trade, field, value)
+        if update_data:
+            update_stmt = update(Trade).where(and_(Trade.trade_id == trade_id, Trade.version == version)).values(**update_data)
+            db.execute(update_stmt)
 
         db.commit()
-        db.refresh(db_trade)
-        return db_trade
+        updated_trade = TradeService.get_trade(db, trade_id, version)
+        if not updated_trade:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Trade {trade_id} with version {version} not found"
+            )
+        return updated_trade
 
     @staticmethod
     def delete_trade(db: Session, trade_id: str, version: int) -> bool:
@@ -83,7 +95,8 @@ class TradeService:
                 status_code=status.HTTP_404_NOT_FOUND, detail=f"Trade {trade_id} with version {version} not found"
             )
 
-        db.delete(db_trade)
+        delete_stmt = delete(Trade).where(and_(Trade.trade_id == trade_id, Trade.version == version))
+        db.execute(delete_stmt)
         db.commit()
         return True
 
@@ -93,12 +106,11 @@ class TradeService:
         Mark all trades as expired where maturity_date < today
         """
         today = date.today()
-        expired_trades = db.query(Trade).filter(and_(Trade.maturity_date < today, Trade.expired == False)).all()
-
-        count = 0
-        for trade in expired_trades:
-            trade.expired = True
-            count += 1
-
+        update_stmt = (
+            update(Trade)
+            .where(and_(Trade.maturity_date < today, Trade.expired.is_(False)))
+            .values(expired=True)
+        )
+        result = db.execute(update_stmt)
         db.commit()
-        return count
+        return result.rowcount or 0

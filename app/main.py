@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from typing import List
 from contextlib import asynccontextmanager
@@ -197,7 +198,7 @@ def delete_trade(trade_id: str, version: int):
 def get_all_trades(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     from app.models import Trade
 
-    trades = db.query(Trade).offset(skip).limit(limit).all()
+    trades = db.execute(select(Trade).offset(skip).limit(limit)).scalars().all()
     return trades
 
 
