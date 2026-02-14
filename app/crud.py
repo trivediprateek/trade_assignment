@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, select, insert, update, delete
+from sqlalchemy import select, insert, update, delete
 from app.models import Trade
 from app.schemas import TradeCreate, TradeUpdate
 from datetime import date
@@ -13,7 +13,7 @@ class TradeService:
     @staticmethod
     def get_trade(db: Session, trade_id: str, version: int) -> Optional[Trade]:
         """Get a specific trade by ID and version"""
-        stmt = select(Trade).where(and_(Trade.trade_id == trade_id, Trade.version == version))
+        stmt = select(Trade).where(Trade.trade_id == trade_id, Trade.version == version)
         return db.execute(stmt).scalars().first()
 
     @staticmethod
@@ -44,7 +44,8 @@ class TradeService:
             # Same version: Replace existing trade
             if trade.version == latest_trade.version:
                 delete_stmt = delete(Trade).where(
-                    and_(Trade.trade_id == latest_trade.trade_id, Trade.version == latest_trade.version)
+                    Trade.trade_id == latest_trade.trade_id,
+                    Trade.version == latest_trade.version,
                 )
                 db.execute(delete_stmt)
 
@@ -76,7 +77,7 @@ class TradeService:
             )
 
         if update_data:
-            update_stmt = update(Trade).where(and_(Trade.trade_id == trade_id, Trade.version == version)).values(**update_data)
+            update_stmt = update(Trade).where(Trade.trade_id == trade_id, Trade.version == version).values(**update_data)
             db.execute(update_stmt)
 
         db.commit()
@@ -95,7 +96,7 @@ class TradeService:
                 status_code=status.HTTP_404_NOT_FOUND, detail=f"Trade {trade_id} with version {version} not found"
             )
 
-        delete_stmt = delete(Trade).where(and_(Trade.trade_id == trade_id, Trade.version == version))
+        delete_stmt = delete(Trade).where(Trade.trade_id == trade_id, Trade.version == version)
         db.execute(delete_stmt)
         db.commit()
         return True
@@ -108,7 +109,7 @@ class TradeService:
         today = date.today()
         update_stmt = (
             update(Trade)
-            .where(and_(Trade.maturity_date < today, Trade.expired.is_(False)))
+            .where(Trade.maturity_date < today, Trade.expired.is_(False))
             .values(expired=True)
         )
         result = db.execute(update_stmt)
