@@ -142,12 +142,8 @@ class TestEdgeCases:
         response = client.post("/trades", json=sample_trade)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_missing_required_fields(self, client):
+    def test_missing_required_fields(self, client, incomplete_trade):
         """Test that missing required fields are rejected"""
-        incomplete_trade = {
-            "trade_id": "T1",
-            "version": 1
-        }
         response = client.post("/trades", json=incomplete_trade)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 

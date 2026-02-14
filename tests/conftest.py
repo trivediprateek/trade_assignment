@@ -86,3 +86,11 @@ def past_maturity_trade():
         "created_date": date.today().isoformat(),
         "expired": False
     }
+
+
+@pytest.fixture
+def incomplete_trade():
+    return {
+            "trade_id": "T1",
+            "version": 1
+        }
