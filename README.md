@@ -1,7 +1,7 @@
 # Trade Store REST API
 
-[![CI/CD Pipeline](https://github.com/YOUR_USERNAME/backend_assignment/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/backend_assignment/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/YOUR_USERNAME/backend_assignment/branch/main/graph/badge.svg)](https://codecov.io/gh/YOUR_USERNAME/backend_assignment)
+[![CI/CD Pipeline](https://github.com/YOUR_USERNAME/trade_assignment/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/trade_assignment/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/YOUR_USERNAME/trade_assignment/branch/main/graph/badge.svg)](https://codecov.io/gh/YOUR_USERNAME/trade_assignment)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109.0-green.svg)](https://fastapi.tiangolo.com/)
 [![Kafka](https://img.shields.io/badge/Kafka-Enabled-orange.svg)](https://kafka.apache.org/)
@@ -110,8 +110,8 @@ See [diagrams/](diagrams/) folder for detailed PlantUML diagrams.
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/backend_assignment.git
-   cd backend_assignment
+   git clone https://github.com/YOUR_USERNAME/trade_assignment.git
+   cd trade_assignment
    ```
 
 2. **Create virtual environment**
@@ -128,10 +128,12 @@ See [diagrams/](diagrams/) folder for detailed PlantUML diagrams.
    pip install -r requirements.txt
    ```
 
-4. **Set up environment variables**
-   ```bash
-   copy .env.example .env
-   # Edit .env with your database credentials
+4. **Set environment variables (local only)**
+   ```powershell
+   # PowerShell example (no .env required)
+   $env:DATABASE_URL = "postgresql://tradeuser:tradepass@localhost:5432/tradedb"
+   $env:KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+   $env:KAFKA_TOPIC = "trades"
    ```
 
 5. **Run with Docker Compose** (Recommended - includes Kafka)
@@ -229,6 +231,22 @@ curl -X POST "http://localhost:8000/trades" \
 ```
 
 ## 🧪 Testing
+
+## 🔐 GitHub Actions: Secrets & Variables
+
+Configure CI in GitHub repository settings instead of storing values in `.env`:
+
+- **Secrets**
+   - `DATABASE_URL` (example: `postgresql://tradeuser:<password>@localhost:5432/tradedb`)
+   - `POSTGRES_PASSWORD`
+- **Variables**
+   - `POSTGRES_USER`
+   - `POSTGRES_DB`
+   - `KAFKA_BOOTSTRAP_SERVERS` (use `localhost:9092` for CI)
+   - `KAFKA_TOPIC`
+   - `KAFKA_GROUP_ID`
+
+The workflow `.github/workflows/ci.yml` reads these values directly.
 
 ### Run All Tests
 

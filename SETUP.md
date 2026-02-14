@@ -37,12 +37,19 @@ GRANT ALL PRIVILEGES ON DATABASE tradedb TO tradeuser;
 ### 3. Environment Variables
 
 ```powershell
-# Copy example environment file
-copy .env.example .env
-
-# Edit .env with your settings
-notepad .env
+# Set variables in current PowerShell session (local run)
+$env:DATABASE_URL = "postgresql://tradeuser:tradepass@localhost:5432/tradedb"
+$env:KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+$env:KAFKA_TOPIC = "trades"
+$env:KAFKA_GROUP_ID = "trade-consumer-group"
 ```
+
+### 3.1 GitHub Actions Variables/Secrets
+
+Set these in GitHub repository settings (`Settings > Secrets and variables > Actions`):
+
+- **Secrets**: `DATABASE_URL`, `POSTGRES_PASSWORD`
+- **Variables**: `POSTGRES_USER`, `POSTGRES_DB`, `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_TOPIC`, `KAFKA_GROUP_ID`
 
 ### 4. Run Application
 
