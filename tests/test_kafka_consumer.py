@@ -6,7 +6,7 @@ using mocked Kafka messages and database sessions.
 """
 
 import json
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -56,8 +56,8 @@ class TestExpiredTradeUpdateRules:
                 version=1,
                 counter_party_id="CP-1",
                 book_id="B1",
-                maturity_date=date.today() + timedelta(days=30),
-                created_date=date.today(),
+                maturity_date=datetime.now() + timedelta(days=30),
+                created_date=datetime.now(),
                 expired=True,
             )
         )
@@ -81,8 +81,8 @@ class TestExpiredTradeUpdateRules:
                 version=1,
                 counter_party_id="CP-1",
                 book_id="B1",
-                maturity_date=date.today() + timedelta(days=30),
-                created_date=date.today(),
+                maturity_date=datetime.now() + timedelta(days=30),
+                created_date=datetime.now(),
                 expired=True,
             )
         )
@@ -111,8 +111,8 @@ class TestKafkaMessagePersistence:
                 "version": 1,
                 "counter_party_id": "CP-NEW",
                 "book_id": "BOOK-1",
-                "maturity_date": (date.today() + timedelta(days=30)).isoformat(),
-                "created_date": date.today().isoformat(),
+                "maturity_date": (datetime.now() + timedelta(days=30)).isoformat(),
+                "created_date": datetime.now().isoformat(),
                 "expired": False,
             },
         }
@@ -137,8 +137,8 @@ class TestKafkaMessagePersistence:
                 version=1,
                 counter_party_id="CP-OLD",
                 book_id="BOOK-OLD",
-                maturity_date=date.today() + timedelta(days=60),
-                created_date=date.today(),
+                maturity_date=datetime.now() + timedelta(days=60),
+                created_date=datetime.now(),
                 expired=False,
             )
         )
@@ -173,8 +173,8 @@ class TestKafkaMessagePersistence:
                 version=1,
                 counter_party_id="CP-1",
                 book_id="BOOK-1",
-                maturity_date=date.today() + timedelta(days=60),
-                created_date=date.today(),
+                maturity_date=datetime.now() + timedelta(days=60),
+                created_date=datetime.now(),
                 expired=False,
             )
         )

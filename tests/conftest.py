@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 import os
 
@@ -66,8 +66,8 @@ def sample_trade():
         "version": 1,
         "counter_party_id": "CP-1",
         "book_id": "B1",
-        "maturity_date": (date.today() + timedelta(days=365)).isoformat(),
-        "created_date": date.today().isoformat(),
+        "maturity_date": (datetime.now() + timedelta(days=365)).isoformat(),
+        "created_date": datetime.now().isoformat(),
         "expired": False,
     }
 
@@ -80,8 +80,8 @@ def past_maturity_trade():
         "version": 1,
         "counter_party_id": "CP-2",
         "book_id": "B1",
-        "maturity_date": (date.today() - timedelta(days=1)).isoformat(),
-        "created_date": date.today().isoformat(),
+        "maturity_date": (datetime.now() - timedelta(days=1)).isoformat(),
+        "created_date": datetime.now().isoformat(),
         "expired": False,
     }
 

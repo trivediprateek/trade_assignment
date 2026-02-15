@@ -1,5 +1,5 @@
 import pytest
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 from fastapi import status
 
 
@@ -93,7 +93,7 @@ class TestUpdateTrade:
 
         # Try to update with past maturity date
         # Schema validation still happens at API level, so this should fail with 422
-        update_data = {"maturity_date": (date.today() - timedelta(days=1)).isoformat()}
+        update_data = {"maturity_date": (datetime.now() - timedelta(days=1)).isoformat()}
         response = client.put(f"/trades/{sample_trade['trade_id']}/{sample_trade['version']}", json=update_data)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
@@ -140,7 +140,13 @@ class TestEdgeCases:
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_maturity_date_equals_today(self, client, sample_trade):
-        """Test that maturity date equal to today is accepted"""
-        sample_trade["maturity_date"] = date.today().isoformat()
+        """Test that maturity datetime later today is accepted"""
+        sample_trade["maturity_date"] = (datetime.now() + timedelta(hours=1)).isoformat()
+        response = client.post("/trades", json=sample_trade)
+        assert response.status_code == status.HTTP_202_ACCEPTED
+
+    def test_maturity_datetime_earlier_today_is_accepted(self, client, sample_trade):
+        """Validation should reject past dates, not earlier times on the same date"""
+        sample_trade["maturity_date"] = datetime.now().replace(hour=0, minute=1, second=0, microsecond=0).isoformat()
         response = client.post("/trades", json=sample_trade)
         assert response.status_code == status.HTTP_202_ACCEPTED

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Date, Boolean
+from sqlalchemy import Column, String, Integer, DateTime, Boolean
 from app.database import Base
 
 
@@ -11,8 +11,8 @@ class Trade(Base):
     version = Column(Integer, primary_key=True)
     counter_party_id = Column(String, nullable=False)
     book_id = Column(String, nullable=False)
-    maturity_date = Column(Date, nullable=False)
-    created_date = Column(Date, nullable=False)
+    maturity_date = Column(DateTime, nullable=False)
+    created_date = Column(DateTime, nullable=False)
     expired = Column(Boolean, default=False, nullable=False)
 
     def __repr__(self):
