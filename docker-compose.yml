@@ -44,7 +44,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tradeuser"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tradeuser} -d ${POSTGRES_DB:-tradedb}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -58,7 +58,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://tradeuser:tradepass@postgres:5432/tradedb
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tradeuser}:${POSTGRES_PASSWORD:-tradepass}@postgres:5432/${POSTGRES_DB:-tradedb}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       postgres:
@@ -72,7 +72,7 @@ services:
     volumes:
       - .:/app
     environment:
-      DATABASE_URL: postgresql://tradeuser:tradepass@postgres:5432/tradedb
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tradeuser}:${POSTGRES_PASSWORD:-tradepass}@postgres:5432/${POSTGRES_DB:-tradedb}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: trades
       KAFKA_GROUP_ID: trade-consumer-group

@@ -48,20 +48,20 @@ class TestCreateTrade:
         assert higher_version_trade["trade_id"] in response2.json()["message"]
 
     def test_create_trade_with_lower_version_fails(self, client, sample_trade):
-        """Test that lower version trade is still accepted but fails in consumer"""
+        """Test that lower version trade is rejected synchronously by API pre-validation"""
         # Create initial trade with version 2
         sample_trade["version"] = 2
         response1 = client.post("/trades", json=sample_trade)
         assert response1.status_code == status.HTTP_202_ACCEPTED
 
         # Try to create trade with lower version (1)
-        # API accepts it (202), but consumer will reject it
+        # API should reject it with 400 before enqueueing
         lower_version_trade = sample_trade.copy()
         lower_version_trade["version"] = 1
 
         response2 = client.post("/trades", json=lower_version_trade)
-        # With async processing, API returns 202 (validation happens in consumer)
-        assert response2.status_code == status.HTTP_202_ACCEPTED
+        assert response2.status_code == status.HTTP_400_BAD_REQUEST
+        assert "lower" in response2.json()["detail"].lower()
 
 
 class TestUpdateTrade:

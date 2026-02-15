@@ -40,25 +40,26 @@ async def lifespan(app: FastAPI):
         finally:
             db.close()
 
-    # Startup: Initialize background scheduler for auto-expiry
-    scheduler = AsyncIOScheduler()
+    if os.getenv("TESTING") != "1":
+        # Startup: Initialize background scheduler for auto-expiry
+        scheduler = AsyncIOScheduler()
 
-    def check_expired_trades():
-        db = next(get_db())
-        try:
-            count = TradeService.mark_expired_trades(db)
-            if count > 0:
-                print(f" Auto-marked {count} trades as expired")
-        finally:
-            db.close()
+        def check_expired_trades():
+            db = next(get_db())
+            try:
+                count = TradeService.mark_expired_trades(db)
+                if count > 0:
+                    print(f" Auto-marked {count} trades as expired")
+            finally:
+                db.close()
 
-    # Run expiry check every hour
-    scheduler.add_job(check_expired_trades, "interval", hours=1)
-    scheduler.start()
-    print(" Background scheduler started")
+        # Run expiry check every hour
+        scheduler.add_job(check_expired_trades, "interval", hours=1)
+        scheduler.start()
+        print(" Background scheduler started")
 
-    # Run once on startup
-    check_expired_trades()
+        # Run once on startup
+        check_expired_trades()
     yield
 
     # Shutdown: Flush and close Kafka producer
@@ -83,12 +84,19 @@ def health_check():
 
 
 @app.post("/trades", status_code=status.HTTP_202_ACCEPTED, tags=["Trades"])
-def create_trade(trade: TradeCreate):
+def create_trade(trade: TradeCreate, db: Session = Depends(get_db)):
     """
     Submit a new trade for processing.
     """
     if not hasattr(app.state, "kafka_producer") or app.state.kafka_producer is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Kafka producer not available")
+
+    latest_trade = TradeService.get_latest_trade_version(db, trade.trade_id)
+    if latest_trade and trade.version < latest_trade.version:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Trade version {trade.version} is lower than existing version {latest_trade.version}",
+        )
 
     # Convert Pydantic model to dict and then to JSON
     trade_data = trade.model_dump(mode="json")
