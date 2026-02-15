@@ -1,6 +1,9 @@
 import pytest
 from datetime import datetime, timedelta
 from fastapi import status
+from sqlalchemy import insert
+
+from app.models import Trade
 
 
 class TestHealthCheck:
@@ -47,12 +50,20 @@ class TestCreateTrade:
         assert response2.status_code == status.HTTP_202_ACCEPTED
         assert higher_version_trade["trade_id"] in response2.json()["message"]
 
-    def test_create_trade_with_lower_version_fails(self, client, sample_trade):
+    def test_create_trade_with_lower_version_fails(self, client, sample_trade, test_db):
         """Test that lower version trade is rejected synchronously by API pre-validation"""
-        # Create initial trade with version 2
-        sample_trade["version"] = 2
-        response1 = client.post("/trades", json=sample_trade)
-        assert response1.status_code == status.HTTP_202_ACCEPTED
+        test_db.execute(
+            insert(Trade).values(
+                trade_id=sample_trade["trade_id"],
+                version=2,
+                counter_party_id=sample_trade["counter_party_id"],
+                book_id=sample_trade["book_id"],
+                maturity_date=datetime.fromisoformat(sample_trade["maturity_date"]),
+                created_date=datetime.fromisoformat(sample_trade["created_date"]),
+                expired=False,
+            )
+        )
+        test_db.commit()
 
         # Try to create trade with lower version (1)
         # API should reject it with 400 before enqueueing

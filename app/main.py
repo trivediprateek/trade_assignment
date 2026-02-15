@@ -23,16 +23,21 @@ if os.getenv("TESTING") != "1":
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan events for the application"""
+    is_testing = os.getenv("TESTING") == "1" or getattr(app.state, "testing", False)
+
     # Startup: Initialize Kafka producer
-    kafka_config = {
-        "bootstrap.servers": os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"),
-        "client.id": "trade-api-producer",
-    }
-    app.state.kafka_producer = Producer(kafka_config)
-    print(f" Kafka producer initialized: {kafka_config['bootstrap.servers']}")
+    if is_testing and hasattr(app.state, "kafka_producer") and app.state.kafka_producer is not None:
+        print(" Using mocked Kafka producer in test mode")
+    else:
+        kafka_config = {
+            "bootstrap.servers": os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"),
+            "client.id": "trade-api-producer",
+        }
+        app.state.kafka_producer = Producer(kafka_config)
+        print(f" Kafka producer initialized: {kafka_config['bootstrap.servers']}")
 
     # Startup: Mark expired trades on startup (skip in test mode)
-    if os.getenv("TESTING") != "1":
+    if not is_testing:
         db = next(get_db())
         try:
             count = TradeService.mark_expired_trades(db)
@@ -40,7 +45,7 @@ async def lifespan(app: FastAPI):
         finally:
             db.close()
 
-    if os.getenv("TESTING") != "1":
+    if not is_testing:
         # Startup: Initialize background scheduler for auto-expiry
         scheduler = AsyncIOScheduler()
 

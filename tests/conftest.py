@@ -31,6 +31,7 @@ def override_get_db():
 @pytest.fixture(scope="function")
 def test_db():
     """Create fresh database for each test and return a session"""
+    os.environ["TESTING"] = "1"
     Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
     yield db
@@ -41,6 +42,8 @@ def test_db():
 @pytest.fixture(scope="function")
 def client(test_db):
     """Create test client with mocked Kafka producer"""
+    os.environ["TESTING"] = "1"
+    app.state.testing = True
     app.dependency_overrides[get_db] = override_get_db
 
     # Mock Kafka producer to avoid actual Kafka calls in tests
