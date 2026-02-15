@@ -2,9 +2,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, insert, update, delete
 from app.models import Trade
 from app.schemas import TradeCreate, TradeUpdate
-from datetime import date
+from datetime import datetime, date
 from typing import List, Optional
 from fastapi import HTTPException, status
+from sqlalchemy.sql import func
 
 
 class TradeService:
@@ -104,12 +105,12 @@ class TradeService:
     @staticmethod
     def mark_expired_trades(db: Session) -> int:
         """
-        Mark all trades as expired where maturity_date < today
+        Mark all trades as expired where maturity_date is before today
         """
         today = date.today()
         update_stmt = (
             update(Trade)
-            .where(Trade.maturity_date < today, Trade.expired.is_(False))
+            .where(func.date(Trade.maturity_date) < today, Trade.expired.is_(False))
             .values(expired=True)
         )
         result = db.execute(update_stmt)
