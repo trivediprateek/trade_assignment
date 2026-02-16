@@ -60,40 +60,41 @@ def process_trade_message(message_value: str, db: Session) -> bool:
     """
     try:
         message = json.loads(message_value)
+        trace_id = message.get("trace_id", "unknown")
 
         operation = message.get("operation", "CREATE")
         data = message.get("data", message)
 
         trade_id = data.get("trade_id")
         version = data.get("version")
-        logger.info(f"Processing {operation}: {trade_id} v{version}")
+        logger.info(f"[trace_id={trace_id}] Processing {operation}: {trade_id} v{version}")
         if operation == "CREATE":
             # Validate data
             trade_create = TradeCreate(**data)
 
             # Create trade
-            db_trade = TradeService.create_trade(db, trade_create)
+            db_trade = TradeService.create_trade(db, trade_create, trace_id=trace_id)
 
-            logger.info(f" Successfully created trade {db_trade.trade_id} " f"version {db_trade.version}")
+            logger.info(f"[trace_id={trace_id}] Successfully created trade {db_trade.trade_id} version {db_trade.version}")
             return True
         elif operation == "UPDATE":
             # Validate data
             trade_update = TradeUpdate(**data)
 
-            db_trade = TradeService.update_trade(db, trade_id, version, trade_update)
+            db_trade = TradeService.update_trade(db, trade_id, version, trade_update, trace_id=trace_id)
 
-            logger.info(f" Successfully updated trade {db_trade.trade_id} " f"version {db_trade.version}")
+            logger.info(f"[trace_id={trace_id}] Successfully updated trade {db_trade.trade_id} version {db_trade.version}")
             return True
 
         elif operation == "DELETE":
             # Delete trade
-            TradeService.delete_trade(db, trade_id, version)
+            TradeService.delete_trade(db, trade_id, version, trace_id=trace_id)
 
-            logger.info(f" Successfully deleted trade {trade_id} version {version}")
+            logger.info(f"[trace_id={trace_id}] Successfully deleted trade {trade_id} version {version}")
             return True
 
         else:
-            logger.error(f" Unknown operation: {operation}")
+            logger.error(f"[trace_id={trace_id}] Unknown operation: {operation}")
             return False
 
     except ValueError as e:

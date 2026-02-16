@@ -2,6 +2,7 @@ import pytest
 from datetime import datetime, timedelta
 from fastapi import status
 from sqlalchemy import insert
+from uuid import UUID
 
 from app.models import Trade
 
@@ -27,6 +28,19 @@ class TestCreateTrade:
         data = response.json()
         assert data["status"] == "accepted"
         assert sample_trade["trade_id"] in data["message"]
+
+    def test_create_trade_generates_trace_id_when_header_missing(self, client, sample_trade):
+        response = client.post("/trades", json=sample_trade)
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        trace_id = response.json().get("trace_id")
+        assert trace_id
+        UUID(trace_id)
+
+    def test_create_trade_uses_trace_id_from_header(self, client, sample_trade):
+        trace_id = "trace-req-123"
+        response = client.post("/trades", json=sample_trade, headers={"X-Trace-Id": trace_id})
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert response.json()["trace_id"] == trace_id
 
     def test_create_trade_with_past_maturity_date_fails(self, client, past_maturity_trade):
         """Test validation: Reject trade with maturity date in the past"""
@@ -89,6 +103,7 @@ class TestUpdateTrade:
         # Update returns 202 Accepted (async processing via Kafka)
         assert response.status_code == status.HTTP_202_ACCEPTED
         assert response.json()["status"] == "accepted"
+        assert response.json().get("trace_id")
 
     def test_update_nonexistent_trade_fails(self, client):
         """Test updating non-existent trade (queued but will fail in consumer)"""
@@ -122,6 +137,7 @@ class TestDeleteTrade:
         # Delete returns 202 Accepted (async processing via Kafka)
         assert response.status_code == status.HTTP_202_ACCEPTED
         assert response.json()["status"] == "accepted"
+        assert response.json().get("trace_id")
 
     def test_delete_nonexistent_trade_fails(self, client):
         """Test deleting non-existent trade (queued but will fail in consumer)"""

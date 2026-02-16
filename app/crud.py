@@ -6,10 +6,18 @@ from datetime import datetime, date
 from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy.sql import func
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 class TradeService:
     """Service layer for trade operations"""
+
+    @staticmethod
+    def _ctx(trace_id: Optional[str]) -> str:
+        return f"[trace_id={trace_id}] " if trace_id else ""
 
     @staticmethod
     def get_trade(db: Session, trade_id: str, version: int) -> Optional[Trade]:
@@ -24,7 +32,7 @@ class TradeService:
         return db.execute(stmt).scalars().first()
 
     @staticmethod
-    def create_trade(db: Session, trade: TradeCreate) -> Trade:
+    def create_trade(db: Session, trade: TradeCreate, trace_id: Optional[str] = None) -> Trade:
         """
         Create a new trade with validations:
         1. Reject trades with lower version than existing
@@ -32,6 +40,13 @@ class TradeService:
         3. Reject trades with maturity date in the past
         """
         # Check for existing trade with same trade_id
+        logger.info(
+            "%sCreate trade requested: trade_id=%s version=%s",
+            TradeService._ctx(trace_id),
+            trade.trade_id,
+            trade.version,
+        )
+
         latest_trade = TradeService.get_latest_trade_version(db, trade.trade_id)
 
         if latest_trade:
@@ -59,10 +74,12 @@ class TradeService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Trade was created but could not be retrieved",
             )
+        logger.info("%sCreate trade committed: trade_id=%s version=%s", TradeService._ctx(trace_id), trade.trade_id, trade.version)
         return created_trade
 
     @staticmethod
-    def update_trade(db: Session, trade_id: str, version: int, trade_update: TradeUpdate) -> Trade:
+    def update_trade(db: Session, trade_id: str, version: int, trade_update: TradeUpdate, trace_id: Optional[str] = None) -> Trade:
+        logger.info("%sUpdate trade requested: trade_id=%s version=%s", TradeService._ctx(trace_id), trade_id, version)
         db_trade = TradeService.get_trade(db, trade_id, version)
         if not db_trade:
             raise HTTPException(
@@ -82,6 +99,7 @@ class TradeService:
             db.execute(update_stmt)
 
         db.commit()
+        logger.info("%sUpdate trade committed: trade_id=%s version=%s", TradeService._ctx(trace_id), trade_id, version)
         updated_trade = TradeService.get_trade(db, trade_id, version)
         if not updated_trade:
             raise HTTPException(
@@ -90,7 +108,8 @@ class TradeService:
         return updated_trade
 
     @staticmethod
-    def delete_trade(db: Session, trade_id: str, version: int) -> bool:
+    def delete_trade(db: Session, trade_id: str, version: int, trace_id: Optional[str] = None) -> bool:
+        logger.info("%sDelete trade requested: trade_id=%s version=%s", TradeService._ctx(trace_id), trade_id, version)
         db_trade = TradeService.get_trade(db, trade_id, version)
         if not db_trade:
             raise HTTPException(
@@ -100,6 +119,7 @@ class TradeService:
         delete_stmt = delete(Trade).where(Trade.trade_id == trade_id, Trade.version == version)
         db.execute(delete_stmt)
         db.commit()
+        logger.info("%sDelete trade committed: trade_id=%s version=%s", TradeService._ctx(trace_id), trade_id, version)
         return True
 
     @staticmethod

@@ -1,16 +1,20 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from typing import List
 from contextlib import asynccontextmanager
 import json
 import os
+import uuid
+import logging
 
 from confluent_kafka import Producer
 from app.database import engine, get_db, Base
 from app.schemas import TradeCreate, TradeResponse, TradeUpdate
 from app.crud import TradeService
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+logger = logging.getLogger(__name__)
 
 # Create database tables (skip if testing)
 if os.getenv("TESTING") != "1":
@@ -82,6 +86,11 @@ app = FastAPI(
 )
 
 
+def resolve_trace_id(request: Request) -> str:
+    """Resolve trace_id from request header or generate a new UUID."""
+    return request.headers.get("X-Trace-Id") or str(uuid.uuid4())
+
+
 @app.get("/", tags=["Health"])
 def health_check():
     """Health check endpoint"""
@@ -89,7 +98,7 @@ def health_check():
 
 
 @app.post("/trades", status_code=status.HTTP_202_ACCEPTED, tags=["Trades"])
-def create_trade(trade: TradeCreate, db: Session = Depends(get_db)):
+def create_trade(trade: TradeCreate, request: Request, db: Session = Depends(get_db)):
     """
     Submit a new trade for processing.
     """
@@ -103,9 +112,12 @@ def create_trade(trade: TradeCreate, db: Session = Depends(get_db)):
             detail=f"Trade version {trade.version} is lower than existing version {latest_trade.version}",
         )
 
+    trace_id = resolve_trace_id(request)
+
     # Convert Pydantic model to dict and then to JSON
     trade_data = trade.model_dump(mode="json")
-    message = json.dumps(trade_data)
+    message_data = {"operation": "CREATE", "trace_id": trace_id, "data": trade_data}
+    message = json.dumps(message_data)
 
     topic = os.getenv("KAFKA_TOPIC", "trades")
 
@@ -114,7 +126,7 @@ def create_trade(trade: TradeCreate, db: Session = Depends(get_db)):
             topic,
             value=message.encode("utf-8"),
             key=trade.trade_id.encode("utf-8"),
-            callback=lambda err, msg: print(f" Kafka error: {err}") if err else None,
+            callback=lambda err, msg: logger.error("Kafka error [trace_id=%s]: %s", trace_id, err) if err else None,
         )
         app.state.kafka_producer.poll(0)  # Trigger delivery callbacks
 
@@ -124,6 +136,7 @@ def create_trade(trade: TradeCreate, db: Session = Depends(get_db)):
             "message": f"Trade {trade.trade_id} v{trade.version} queued for processing",
             "trade_id": trade.trade_id,
             "version": trade.version,
+            "trace_id": trace_id,
         }
     except Exception as e:
         raise HTTPException(
@@ -132,12 +145,15 @@ def create_trade(trade: TradeCreate, db: Session = Depends(get_db)):
 
 
 @app.put("/trades/{trade_id}/{version}", status_code=status.HTTP_202_ACCEPTED, tags=["Trades"])
-def update_trade(trade_id: str, version: int, trade_update: TradeUpdate):
+def update_trade(trade_id: str, version: int, trade_update: TradeUpdate, request: Request):
     if not hasattr(app.state, "kafka_producer") or app.state.kafka_producer is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Kafka producer not available")
 
+    trace_id = resolve_trace_id(request)
+
     message_data = {
         "operation": "UPDATE",
+        "trace_id": trace_id,
         "data": {"trade_id": trade_id, "version": version, **trade_update.model_dump(exclude_unset=True, mode="json")},
     }
     message = json.dumps(message_data)
@@ -150,7 +166,7 @@ def update_trade(trade_id: str, version: int, trade_update: TradeUpdate):
             topic,
             value=message.encode("utf-8"),
             key=trade_id.encode("utf-8"),
-            callback=lambda err, msg: print(f" Kafka error: {err}") if err else None,
+            callback=lambda err, msg: logger.error("Kafka error [trace_id=%s]: %s", trace_id, err) if err else None,
         )
         app.state.kafka_producer.poll(0)
 
@@ -159,6 +175,7 @@ def update_trade(trade_id: str, version: int, trade_update: TradeUpdate):
             "message": f"Update for trade {trade_id} v{version} queued for processing",
             "trade_id": trade_id,
             "version": version,
+            "trace_id": trace_id,
         }
     except Exception as e:
         raise HTTPException(
@@ -167,7 +184,7 @@ def update_trade(trade_id: str, version: int, trade_update: TradeUpdate):
 
 
 @app.delete("/trades/{trade_id}/{version}", status_code=status.HTTP_202_ACCEPTED, tags=["Trades"])
-def delete_trade(trade_id: str, version: int):
+def delete_trade(trade_id: str, version: int, request: Request):
     """
     Submit a trade deletion for processing.
 
@@ -178,8 +195,10 @@ def delete_trade(trade_id: str, version: int):
     if not hasattr(app.state, "kafka_producer") or app.state.kafka_producer is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Kafka producer not available")
 
+    trace_id = resolve_trace_id(request)
+
     # Build message with operation type
-    message_data = {"operation": "DELETE", "data": {"trade_id": trade_id, "version": version}}
+    message_data = {"operation": "DELETE", "trace_id": trace_id, "data": {"trade_id": trade_id, "version": version}}
     message = json.dumps(message_data)
 
     # Get Kafka topic from environment
@@ -191,7 +210,7 @@ def delete_trade(trade_id: str, version: int):
             topic,
             value=message.encode("utf-8"),
             key=trade_id.encode("utf-8"),
-            callback=lambda err, msg: print(f" Kafka error: {err}") if err else None,
+            callback=lambda err, msg: logger.error("Kafka error [trace_id=%s]: %s", trace_id, err) if err else None,
         )
         app.state.kafka_producer.poll(0)
 
@@ -200,6 +219,7 @@ def delete_trade(trade_id: str, version: int):
             "message": f"Delete for trade {trade_id} v{version} queued for processing",
             "trade_id": trade_id,
             "version": version,
+            "trace_id": trace_id,
         }
     except Exception as e:
         raise HTTPException(
