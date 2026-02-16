@@ -51,7 +51,7 @@ services:
 
   app:
     build: .
-    image: ${APP_IMAGE:-trade_assignment-app:latest}
+    image: ${APP_IMAGE:-ghcr.io/trivediprateek/trade-assignment:latest}
     container_name: trade_api
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
@@ -69,7 +69,7 @@ services:
 
   kafka-consumer:
     build: .
-    image: ${KAFKA_CONSUMER_IMAGE:-trade_assignment-kafka-consumer:latest}
+    image: ${KAFKA_CONSUMER_IMAGE:-ghcr.io/trivediprateek/trade-assignment-kafka-consumer:latest}
     command: python -m app.kafka_consumer
     volumes:
       - .:/app
